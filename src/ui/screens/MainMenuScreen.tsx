@@ -1,5 +1,3 @@
-import { StickerArt } from "../components/StickerArt/StickerArt";
-
 interface MainMenuScreenProps {
   hasSavedRun: boolean;
   onBeginRun: () => void;
@@ -15,49 +13,45 @@ export function MainMenuScreen({
 }: MainMenuScreenProps) {
   return (
     <main className="menu-screen">
-      <section className="screen-card menu-card">
-        <div className="menu-hero">
+      <section className="menu-card screen-card">
+        <div className="menu-layout">
           <div className="menu-copy">
-            <p className="eyebrow">Arcade Poker Run</p>
-            <h1 className="hero-title">
-              Stack chips.
-              <br />
-              Bend the deck.
-              <br />
-              Break the blind.
-            </h1>
-            <p className="hero-copy">
-              A louder, sticker-heavy prototype pass inspired by Balatro: loud colors, rising
-              cards, and a deeper joker mix built around quick scoring turns.
+            <span className="board-label">Balatro-inspired prototype</span>
+            <h1 className="menu-title">Balatro Redux</h1>
+            <p className="menu-text">
+              The scoring logic is already wired. This pass focuses on a closer table layout, tighter
+              card presentation, and a less noisy interface.
             </p>
-
-            <div className="menu-pill-row">
-              <span className="menu-pill">9 blinds</span>
-              <span className="menu-pill">12 jokers</span>
-              <span className="menu-pill">4 shop offers</span>
-            </div>
-
             <div className="menu-actions">
-              <button className="button-primary" type="button" onClick={onBeginRun}>
-                Deal Fresh Run
+              <button type="button" onClick={onBeginRun}>
+                Start Run
               </button>
               {hasSavedRun ? (
-                <button type="button" onClick={onContinueRun}>
+                <button className="button-table" type="button" onClick={onContinueRun}>
                   Continue Save
                 </button>
               ) : null}
               {hasSavedRun ? (
-                <button className="button-danger" type="button" onClick={onDeleteSave}>
+                <button className="button-table button-table--ghost" type="button" onClick={onDeleteSave}>
                   Delete Save
                 </button>
               ) : null}
             </div>
           </div>
 
-          <div className="menu-art-stack">
-            <StickerArt className="menu-sticker-primary" icon="fan" stamp="ANTE 1" size="hero" tone="gold" />
-            <StickerArt className="menu-sticker-secondary" icon="chip" stamp="MULT" size="panel" tone="midnight" />
-            <StickerArt className="menu-sticker-tertiary" icon="grin" stamp="JOKER" size="panel" tone="crimson" />
+          <div className="menu-preview">
+            <div className="menu-preview__board">
+              <div className="menu-preview__joker" />
+              <div className="menu-preview__joker menu-preview__joker--offset" />
+              <div className="menu-preview__hand">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="menu-preview__deck" />
+            </div>
           </div>
         </div>
       </section>

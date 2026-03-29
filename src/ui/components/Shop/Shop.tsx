@@ -11,14 +11,15 @@ interface ShopProps {
 
 export function Shop({ money, offers, onBuy, onContinue }: ShopProps) {
   return (
-    <section>
-      <div className="panel-heading">
+    <section className="shop-panel">
+      <div className="shop-panel__header">
         <div>
-          <p className="panel-kicker">Between Blinds</p>
-          <h2 className="panel-title">Shop</h2>
+          <span className="board-label">Shop</span>
+          <h2>Pick a joker</h2>
         </div>
-        <StickerArt icon="satchel" stamp="SHOP" size="panel" tone="ember" />
+        <div className="shop-panel__money">${money}</div>
       </div>
+
       <div className="shop-grid">
         {offers.map((offer) => {
           const joker = JOKER_BY_ID[offer.jokerId];
@@ -29,31 +30,34 @@ export function Shop({ money, offers, onBuy, onContinue }: ShopProps) {
 
           return (
             <article className="shop-card" key={offer.id}>
-              <StickerArt icon={joker.art.icon} stamp={joker.art.stamp} size="card" tone={joker.art.tone} />
-              <div className="info-block">
-                <div className="card-headline">
-                  <h4>{joker.name}</h4>
+              <div className="shop-card__art">
+                <StickerArt icon={joker.art.icon} stamp={joker.art.stamp} size="card" tone={joker.art.tone} />
+              </div>
+              <div className="shop-card__info">
+                <div className="shop-card__headline">
+                  <h3>{joker.name}</h3>
                   <span className={`rarity-pill rarity-pill--${joker.rarity}`}>{joker.rarity}</span>
                 </div>
-                <p className="muted">{joker.description}</p>
+                <p>{joker.description}</p>
+                <footer>
+                  <span className="price-chip">${offer.price}</span>
+                  <button
+                    type="button"
+                    disabled={offer.sold || money < offer.price}
+                    onClick={() => onBuy(offer.id)}
+                  >
+                    {offer.sold ? "Sold" : "Buy"}
+                  </button>
+                </footer>
               </div>
-              <footer>
-                <span className="price-chip">${offer.price}</span>
-                <button
-                  type="button"
-                  disabled={offer.sold || money < offer.price}
-                  onClick={() => onBuy(offer.id)}
-                >
-                  {offer.sold ? "Sold" : "Buy"}
-                </button>
-              </footer>
             </article>
           );
         })}
       </div>
-      <div className="shop-actions" style={{ marginTop: "1rem" }}>
-        <button className="button-primary" type="button" onClick={onContinue}>
-          Continue To Next Blind
+
+      <div className="shop-panel__actions">
+        <button className="button-table" type="button" onClick={onContinue}>
+          Continue
         </button>
       </div>
     </section>
