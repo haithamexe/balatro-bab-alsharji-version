@@ -11,6 +11,7 @@ const INITIAL_DISCARDS = 3;
 const INITIAL_MONEY = 4;
 const INITIAL_SELECTION_SIZE = 5;
 const FINAL_ROUND = 9;
+const SHOP_OFFER_COUNT = 4;
 
 function computeRoundTarget(ante: number, blindId: string): number {
   const blind = BLIND_BY_ID[blindId];
@@ -23,7 +24,7 @@ function createShopOffers(seed: number, ownedJokers: string[], round: number): S
   const candidates = pool.length > 0 ? pool : JOKERS;
   const shuffled = shuffle(candidates, seed);
 
-  return shuffled.items.slice(0, 3).map((joker, index) => ({
+  return shuffled.items.slice(0, SHOP_OFFER_COUNT).map((joker, index) => ({
     id: `${joker.id}-${round}-${index}`,
     jokerId: joker.id,
     price: joker.cost,
@@ -66,7 +67,7 @@ export function createInitialRunState(seed = 1): RunState {
     maxHandSize: INITIAL_HAND_SIZE,
     maxSelectionSize: INITIAL_SELECTION_SIZE,
     lastScoringHand: null,
-    message: "Build a scoring engine around Redux, then start the run.",
+    message: "Ante up and carve a route through the blinds.",
   };
 }
 
@@ -80,7 +81,7 @@ export function startRun(state: RunState): RunState {
     seed: roundSetup.seed,
     roundTarget: computeRoundTarget(1, "small_blind"),
     status: "playing",
-    message: "Small Blind is live. Pick up to five cards and play a hand.",
+    message: "Small Blind is live. Lift up to five cards and fire your first hand.",
   };
 }
 
@@ -99,7 +100,7 @@ export function toggleCard(state: RunState, cardId: string): RunState {
     return {
       ...state,
       selected: state.selected.filter((selectedId) => selectedId !== cardId),
-      message: "Card returned to your hand.",
+      message: "Card dropped back into the fan.",
     };
   }
 
@@ -113,7 +114,7 @@ export function toggleCard(state: RunState, cardId: string): RunState {
   return {
     ...state,
     selected: [...state.selected, cardId],
-    message: "Card locked in for scoring.",
+    message: "Card snapped into the scoring line.",
   };
 }
 
@@ -198,7 +199,7 @@ export function playHand(state: RunState): RunState {
       shopOffers: createShopOffers(drawResult.seed, state.jokers, state.round),
       seed: drawResult.seed,
       lastScoringHand: scoring,
-      message: `Blind cleared with ${scoring.handName}. Collect your reward and shop.`,
+      message: `Blind cracked with ${scoring.handName}. Cash out and hit the shop.`,
     };
   }
 
@@ -215,7 +216,7 @@ export function playHand(state: RunState): RunState {
       seed: drawResult.seed,
       status: "game_over",
       lastScoringHand: scoring,
-      message: "The blind held. Start a new run and tune your scoring route.",
+      message: "The blind held. Recut the deck and try a new line.",
     };
   }
 
@@ -230,7 +231,7 @@ export function playHand(state: RunState): RunState {
     money: nextMoney,
     seed: drawResult.seed,
     lastScoringHand: scoring,
-    message: `${scoring.handName} scored ${scoring.total}. Keep pushing the blind.`,
+    message: `${scoring.handName} paid ${scoring.total}. Keep squeezing the blind.`,
   };
 }
 
@@ -259,7 +260,7 @@ export function buyShopOffer(state: RunState, offerId: string): RunState {
     shopOffers: state.shopOffers.map((shopOffer) =>
       shopOffer.id === offerId ? { ...shopOffer, sold: true } : shopOffer,
     ),
-    message: "Joker added to the run.",
+    message: "Joker snapped into your lineup.",
   };
 }
 
@@ -275,7 +276,7 @@ export function advanceFromShop(state: RunState): RunState {
       ...state,
       status: "victory",
       shopOffers: [],
-      message: "Nine blinds down. The prototype run is complete.",
+      message: "Nine blinds down. The table belongs to you.",
     };
   }
 
@@ -298,7 +299,7 @@ export function advanceFromShop(state: RunState): RunState {
     shopOffers: [],
     status: "playing",
     lastScoringHand: null,
-    message: `${BLIND_BY_ID[blindId].name} is up. New ante, same deck pressure.`,
+    message: `${BLIND_BY_ID[blindId].name} is up. New ante, nastier pressure.`,
   };
 }
 

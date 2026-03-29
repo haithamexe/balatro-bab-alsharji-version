@@ -16,10 +16,12 @@ export function Hand({ cards, selectedIds, onSelect }: HandProps) {
   return (
     <div className="hand">
       <AnimatePresence initial={false}>
-        {cards.map((card) => (
+        {cards.map((card, index) => (
           <CardView
             key={card.id}
             card={card}
+            index={index}
+            total={cards.length}
             selected={selectedIds.includes(card.id)}
             onSelect={onSelect}
           />

@@ -1,5 +1,6 @@
 import { JOKER_BY_ID } from "../../../game/content/jokers";
 import type { ShopOffer } from "../../../game/types/run";
+import { StickerArt } from "../StickerArt/StickerArt";
 
 interface ShopProps {
   money: number;
@@ -11,7 +12,13 @@ interface ShopProps {
 export function Shop({ money, offers, onBuy, onContinue }: ShopProps) {
   return (
     <section>
-      <h2 className="panel-title">Shop</h2>
+      <div className="panel-heading">
+        <div>
+          <p className="panel-kicker">Between Blinds</p>
+          <h2 className="panel-title">Shop</h2>
+        </div>
+        <StickerArt icon="satchel" stamp="SHOP" size="panel" tone="ember" />
+      </div>
       <div className="shop-grid">
         {offers.map((offer) => {
           const joker = JOKER_BY_ID[offer.jokerId];
@@ -22,10 +29,16 @@ export function Shop({ money, offers, onBuy, onContinue }: ShopProps) {
 
           return (
             <article className="shop-card" key={offer.id}>
-              <h4>{joker.name}</h4>
-              <p className="muted">{joker.description}</p>
+              <StickerArt icon={joker.art.icon} stamp={joker.art.stamp} size="card" tone={joker.art.tone} />
+              <div className="info-block">
+                <div className="card-headline">
+                  <h4>{joker.name}</h4>
+                  <span className={`rarity-pill rarity-pill--${joker.rarity}`}>{joker.rarity}</span>
+                </div>
+                <p className="muted">{joker.description}</p>
+              </div>
               <footer>
-                <span>${offer.price}</span>
+                <span className="price-chip">${offer.price}</span>
                 <button
                   type="button"
                   disabled={offer.sold || money < offer.price}

@@ -1,4 +1,5 @@
 import { JOKER_BY_ID } from "../../../game/content/jokers";
+import { StickerArt } from "../StickerArt/StickerArt";
 
 interface JokerRowProps {
   jokerIds: string[];
@@ -20,9 +21,18 @@ export function JokerRow({ jokerIds }: JokerRowProps) {
 
         return (
           <article className="joker-card" key={`${jokerId}-${index}`}>
-            <h4>{joker.name}</h4>
-            <p className="muted">{joker.description}</p>
-            <span className="muted">{joker.rarity}</span>
+            <StickerArt icon={joker.art.icon} stamp={joker.art.stamp} size="card" tone={joker.art.tone} />
+            <div className="info-block">
+              <div className="card-headline">
+                <h4>{joker.name}</h4>
+                <span className={`rarity-pill rarity-pill--${joker.rarity}`}>{joker.rarity}</span>
+              </div>
+              <p className="muted">{joker.description}</p>
+              <div className="joker-meta">
+                <span>${joker.cost}</span>
+                <span>{joker.effect.replace(/_/g, " ")}</span>
+              </div>
+            </div>
           </article>
         );
       })}
