@@ -9,10 +9,6 @@ interface CardFaceProps {
   card: Card;
 }
 
-export function getCardSuitClass(card: Card): string {
-  return `card--${card.suit}`;
-}
-
 export function CardFace({ card }: CardFaceProps) {
   return (
     <>
