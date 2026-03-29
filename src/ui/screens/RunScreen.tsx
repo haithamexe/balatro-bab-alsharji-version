@@ -40,12 +40,34 @@ interface PlaySequenceState {
   baseChips: number;
 }
 
+type HandSortMode = "rank" | "suit" | "manual";
+
+const SUIT_SORT_ORDER: Record<Card["suit"], number> = {
+  clubs: 0,
+  diamonds: 1,
+  hearts: 2,
+  spades: 3,
+};
+
+function compareCardsByRank(left: Card, right: Card): number {
+  return right.rank - left.rank || SUIT_SORT_ORDER[left.suit] - SUIT_SORT_ORDER[right.suit];
+}
+
+function compareCardsBySuit(left: Card, right: Card): number {
+  return SUIT_SORT_ORDER[left.suit] - SUIT_SORT_ORDER[right.suit] || right.rank - left.rank;
+}
+
 function syncHandOrder(previousOrder: string[], hand: Card[]): string[] {
   const handIds = hand.map((card) => card.id);
   const validIds = new Set(handIds);
   const preserved = previousOrder.filter((id) => validIds.has(id));
   const appended = handIds.filter((id) => !preserved.includes(id));
   return [...preserved, ...appended];
+}
+
+function getSortedHandOrder(hand: Card[], sortMode: Exclude<HandSortMode, "manual">): string[] {
+  const compare = sortMode === "suit" ? compareCardsBySuit : compareCardsByRank;
+  return [...hand].sort(compare).map((card) => card.id);
 }
 
 function orderHand(hand: Card[], handOrder: string[]): Card[] {
@@ -62,9 +84,11 @@ export function RunScreen({ onBeginRun, onReturnToMenu }: RunScreenProps) {
   const canPlay = useAppSelector(selectCanPlay);
   const canDiscard = useAppSelector(selectCanDiscard);
   const [handOrder, setHandOrder] = useState<string[]>([]);
+  const [handSortMode, setHandSortMode] = useState<HandSortMode>("rank");
   const [deckViewerOpen, setDeckViewerOpen] = useState(false);
   const [playSequence, setPlaySequence] = useState<PlaySequenceState | null>(null);
   const playTimersRef = useRef<number[]>([]);
+  const previousHandSignatureRef = useRef("");
 
   const orderedHand = useMemo(() => orderHand(game.hand, handOrder), [game.hand, handOrder]);
   const lockedCardIds = playSequence?.cards.map((card) => card.id) ?? [];
@@ -79,14 +103,23 @@ export function RunScreen({ onBeginRun, onReturnToMenu }: RunScreenProps) {
   };
 
   useEffect(() => {
-    setHandOrder((currentOrder) => {
-      const nextOrder = syncHandOrder(currentOrder, game.hand);
-      return nextOrder.length === currentOrder.length &&
-        nextOrder.every((cardId, index) => cardId === currentOrder[index])
-        ? currentOrder
-        : nextOrder;
-    });
-  }, [game.hand]);
+    const currentSignature = game.hand.map((card) => card.id).join("|");
+    const handChanged = previousHandSignatureRef.current !== currentSignature;
+    previousHandSignatureRef.current = currentSignature;
+
+    if (handChanged && handSortMode !== "rank") {
+      setHandSortMode("rank");
+    }
+
+    if (handSortMode === "manual" && !handChanged) {
+      return;
+    }
+
+    const nextSortMode: Exclude<HandSortMode, "manual"> =
+      handChanged || handSortMode === "manual" ? "rank" : handSortMode;
+
+    setHandOrder(getSortedHandOrder(game.hand, nextSortMode));
+  }, [game.hand, handSortMode]);
 
   useEffect(() => () => clearPlayTimers(), []);
 
@@ -173,6 +206,16 @@ export function RunScreen({ onBeginRun, onReturnToMenu }: RunScreenProps) {
   const handleContinueFromShop = () => {
     playConfirm();
     dispatch(continueFromShop());
+  };
+
+  const handleSortByRank = () => {
+    setHandSortMode("rank");
+    setHandOrder(getSortedHandOrder(game.hand, "rank"));
+  };
+
+  const handleSortBySuit = () => {
+    setHandSortMode("suit");
+    setHandOrder(getSortedHandOrder(game.hand, "suit"));
   };
 
   const livePreview = playSequence
@@ -320,7 +363,10 @@ export function RunScreen({ onBeginRun, onReturnToMenu }: RunScreenProps) {
                 lockedIds={lockedCardIds}
                 dragDisabled={Boolean(playSequence)}
                 onSelect={(cardId) => dispatch(toggleSelectCard(cardId))}
-                onReorder={setHandOrder}
+                onReorder={(cardIds) => {
+                  setHandSortMode("manual");
+                  setHandOrder(cardIds);
+                }}
               />
               <button
                 className="deck-stack"
@@ -336,6 +382,28 @@ export function RunScreen({ onBeginRun, onReturnToMenu }: RunScreenProps) {
                 <div className="deck-stack__count">{game.drawPile.length}/52</div>
                 <span className="deck-stack__hint">View deck</span>
               </button>
+            </div>
+
+            <div className="hand-sort">
+              <span className="board-label">Sort hand</span>
+              <div className="hand-sort__actions">
+                <button
+                  className={`button-table button-table--sort ${handSortMode === "rank" ? "button-table--active" : ""}`}
+                  type="button"
+                  disabled={Boolean(playSequence)}
+                  onClick={handleSortByRank}
+                >
+                  Rank
+                </button>
+                <button
+                  className={`button-table button-table--sort ${handSortMode === "suit" ? "button-table--active" : ""}`}
+                  type="button"
+                  disabled={Boolean(playSequence)}
+                  onClick={handleSortBySuit}
+                >
+                  Suit
+                </button>
+              </div>
             </div>
 
             <div className="action-dock">
