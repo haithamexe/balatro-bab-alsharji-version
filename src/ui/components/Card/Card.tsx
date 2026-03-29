@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import type { CSSProperties } from "react";
 import {
   CARD_CHIP_VALUES,
   RANK_LABELS,
@@ -20,6 +21,7 @@ export function CardView({ card, index, total, selected, onSelect }: CardProps) 
   const centerOffset = index - (total - 1) / 2;
   const baseRotate = centerOffset * 4.5;
   const baseY = Math.abs(centerOffset) * 5;
+  const cardStyle = { zIndex: selected ? 40 : index + 1 } as CSSProperties;
 
   const handleClick = () => {
     playCardTap();
@@ -28,23 +30,33 @@ export function CardView({ card, index, total, selected, onSelect }: CardProps) 
 
   return (
     <motion.button
-      layout
+      layout="position"
       type="button"
       className={`card ${selected ? "selected" : ""} ${isRed ? "red" : ""}`}
       onClick={handleClick}
       initial={false}
       animate={{
         rotate: selected ? 0 : baseRotate,
-        y: selected ? -34 : baseY,
-        scale: selected ? 1.03 : 1,
+        y: selected ? -26 : baseY,
+        scale: selected ? 1.018 : 1,
+        boxShadow: selected
+          ? "0 22px 30px rgba(0, 0, 0, 0.34)"
+          : "0 10px 18px rgba(0, 0, 0, 0.22)",
       }}
       whileHover={{
-        y: selected ? -40 : baseY - 10,
-        scale: selected ? 1.04 : 1.02,
+        rotate: selected ? 0 : baseRotate * 0.88,
+        y: selected ? -32 : baseY - 10,
+        scale: selected ? 1.028 : 1.018,
+        boxShadow: selected
+          ? "0 24px 34px rgba(0, 0, 0, 0.36)"
+          : "0 14px 22px rgba(0, 0, 0, 0.26)",
       }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      style={{ zIndex: selected ? 40 : index + 1 }}
+      whileTap={{
+        y: selected ? -20 : baseY - 3,
+        scale: 0.985,
+      }}
+      transition={{ type: "spring", stiffness: 340, damping: 28, mass: 0.72 }}
+      style={cardStyle}
     >
       <div className="card-corner">
         <span className="card-rank">{RANK_LABELS[card.rank]}</span>

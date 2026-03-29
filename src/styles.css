@@ -439,7 +439,7 @@ button:disabled {
 .table-board {
   position: relative;
   min-height: 780px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .table-surface {
@@ -449,6 +449,7 @@ button:disabled {
   background:
     radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.05), transparent 55%),
     linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+  overflow: visible;
 }
 
 .table-surface::before {
@@ -712,6 +713,7 @@ button:disabled {
   gap: 1rem;
   align-items: end;
   margin-top: 1rem;
+  overflow: visible;
 }
 
 .hand-zone__count {
@@ -721,23 +723,32 @@ button:disabled {
 }
 
 .hand {
+  --hand-size: 1;
+  --hand-overlap: 18px;
+  --card-width: clamp(
+    72px,
+    calc((100% + ((var(--hand-size) - 1) * var(--hand-overlap))) / var(--hand-size)),
+    112px
+  );
   display: flex;
+  width: 100%;
+  min-width: 0;
   justify-content: center;
   align-items: flex-end;
-  min-height: 230px;
-  padding: 0 0 1rem;
-  overflow-x: auto;
-  overflow-y: visible;
+  min-height: 248px;
+  padding: 1.25rem 0 1rem;
+  overflow: visible;
 }
 
 .hand .card + .card {
-  margin-left: -18px;
+  margin-left: calc(var(--hand-overlap) * -1);
 }
 
 .card {
   position: relative;
-  width: 112px;
-  height: 162px;
+  width: var(--card-width);
+  height: auto;
+  aspect-ratio: 112 / 162;
   flex: 0 0 auto;
   padding: 0.65rem;
   border: 3px solid rgba(25, 34, 38, 0.9);
@@ -747,6 +758,7 @@ button:disabled {
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.22);
   overflow: hidden;
   transform-origin: bottom center;
+  will-change: transform;
 }
 
 .card::before {
@@ -959,7 +971,7 @@ button:disabled {
   }
 
   .hand {
-    justify-content: flex-start;
+    justify-content: center;
   }
 }
 
@@ -983,12 +995,4 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .hand .card + .card {
-    margin-left: -10px;
-  }
-
-  .card {
-    width: 96px;
-    height: 144px;
-  }
 }
