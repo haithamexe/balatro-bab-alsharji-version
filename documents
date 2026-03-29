@@ -1,0 +1,963 @@
+# Balatro Redux Prototype Documentation
+
+## 1. What This Project Is
+
+This project is a React + Redux card game prototype inspired by Balatro.
+
+It is built around one important architectural idea:
+
+- the game rules live in pure functions
+- the UI reads state and dispatches actions
+- animation and interaction state that should not permanently change the game lives locally in React
+
+That separation is the main reason this project is understandable.
+
+If you want to learn how to build a game in React, this is the right mental model:
+
+1. Put permanent game rules in pure engine code.
+2. Put global game state in one central store.
+3. Put temporary visual state in local components or hooks.
+4. Use selectors for derived values like previews.
+5. Keep rendering components mostly dumb.
+
+The project already follows that direction.
+
+---
+
+## 2. How To Run The Project
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the dev server:
+
+```bash
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Current scripts are defined in `package.json`.
+
+---
+
+## 3. Tech Stack
+
+- React for UI
+- Redux Toolkit for global game state
+- Framer Motion for card/screen animation and drag reordering
+- Howler for audio hooks
+- Vite for bundling and dev server
+- Vitest for tests
+
+---
+
+## 4. High-Level Architecture
+
+The app is easiest to understand in 4 layers.
+
+### Layer 1: Domain Types
+
+These define what the game is made of.
+
+Examples:
+
+- cards
+- scoring types
+- run state
+- joker definitions
+- blind definitions
+
+These types exist so the rest of the code can stay explicit.
+
+### Layer 2: Core Game Engine
+
+This is the real rules layer.
+
+It answers questions like:
+
+- how do you create and shuffle a deck?
+- how do you evaluate a selected hand?
+- how do you score that hand?
+- how do you move from one round to the next?
+
+Important property:
+
+- this layer should not know anything about React components
+- this layer should not depend on DOM state
+- this layer should be mostly pure and testable
+
+### Layer 3: Store and Selectors
+
+Redux sits between engine and UI.
+
+It does two jobs:
+
+- stores the current run state
+- exposes actions and derived selectors to the UI
+
+Selectors are important because they compute values the UI needs without forcing components to manually rebuild that logic every render.
+
+### Layer 4: UI and Interaction Layer
+
+This is the React side.
+
+It handles:
+
+- rendering screens
+- drag interactions
+- animation timing
+- deck viewer modal
+- play telegraphing
+- hand sorting controls
+
+This layer should orchestrate experience, not redefine rules.
+
+That is the difference between:
+
+- "what the game means"
+- "how the player experiences it"
+
+---
+
+## 5. File Map And Reading Order
+
+If you want to understand the project later, read files in this order.
+
+### Core game engine
+
+1. `src/game/types/cards.ts`
+2. `src/game/types/scoring.ts`
+3. `src/game/types/run.ts`
+4. `src/game/core/deck.ts`
+5. `src/game/core/handEvaluator.ts`
+6. `src/game/core/scoring.ts`
+7. `src/game/core/modifiers.ts`
+8. `src/game/core/runState.ts`
+
+### Store
+
+1. `src/store/store.ts`
+2. `src/store/gameSlice.ts`
+3. `src/store/selectors.ts`
+
+### App/UI entry
+
+1. `src/main.tsx`
+2. `src/app/App.tsx`
+3. `src/ui/screens/RunScreen.tsx`
+
+### Interaction helpers
+
+1. `src/ui/screens/run-screen/useHandState.ts`
+2. `src/ui/screens/run-screen/handSort.ts`
+3. `src/ui/screens/run-screen/usePlaySequence.ts`
+4. `src/ui/screens/run-screen/playSequence.ts`
+5. `src/ui/components/Hand/Hand.tsx`
+6. `src/ui/components/Hand/HandCard.tsx`
+7. `src/ui/screens/run-screen/PlayField.tsx`
+8. `src/ui/screens/run-screen/DeckViewer.tsx`
+
+---
+
+## 6. The Main Game State
+
+The central state shape is the run state.
+
+Conceptually it contains:
+
+- deck
+- draw pile
+- discard pile
+- current hand
+- selected cards
+- joker list
+- money
+- ante
+- round
+- target score
+- round score
+- remaining hands
+- remaining discards
+- current blind
+- shop offers
+- game status
+- last scoring breakdown
+- status message
+
+This state is global because many different parts of the UI need it at the same time.
+
+Examples:
+
+- HUD needs round score and money
+- hand needs selected IDs
+- play controls need whether play/discard are allowed
+- shop needs offers and money
+- deck viewer needs draw pile
+
+If this state was fragmented across components, the app would become harder to reason about.
+
+---
+
+## 7. How The Reducer Layer Works
+
+The Redux slice is intentionally thin.
+
+`src/store/gameSlice.ts` mostly maps Redux actions to engine functions:
+
+- `beginRun -> startRun`
+- `toggleSelectCard -> toggleCard`
+- `playSelectedHand -> playHand`
+- `discardSelectedCards -> discardSelected`
+- `buyJoker -> buyShopOffer`
+- `continueFromShop -> advanceFromShop`
+- `goToMenu -> returnToMenu`
+
+This is a good pattern.
+
+Why?
+
+Because the slice is not trying to contain all business logic.
+
+Instead:
+
+- Redux owns action wiring
+- engine functions own rules
+
+This keeps reducers cleaner and easier to test conceptually.
+
+---
+
+## 8. How A Turn Actually Works
+
+This is the most important part of the game flow.
+
+### Step 1: Start a run
+
+`startRun` in `src/game/core/runState.ts`:
+
+- increments the seed
+- resets the deck and round state
+- shuffles the deck
+- draws the opening hand
+- marks the game as `playing`
+
+### Step 2: Select cards
+
+`toggleCard`:
+
+- adds or removes a card ID from `selected`
+- enforces the maximum selection size
+- updates the message shown in the HUD
+
+### Step 3: Preview the result before committing
+
+This is handled by selectors in `src/store/selectors.ts`.
+
+`selectHandPreview`:
+
+- takes selected cards from the store
+- runs `evaluateHand`
+- runs `scoreHand`
+- returns both evaluation and score
+
+This is important.
+
+The preview is not persisted into reducer state.
+
+It is derived on demand.
+
+That is a very good React pattern because:
+
+- preview is derived data
+- derived data should often stay out of permanent state
+
+### Step 4: Play the hand
+
+The actual rules commit in `playHand` in `src/game/core/runState.ts`.
+
+That function:
+
+1. collects selected cards
+2. evaluates the hand
+3. scores the hand
+4. moves played cards into discard
+5. draws replacement cards
+6. updates score, money, and hands remaining
+7. determines whether the player:
+   - won the blind and enters shop
+   - lost the round and enters game over
+   - continues playing
+
+This function changes permanent game state.
+
+That is why it belongs in the engine layer.
+
+### Step 5: Discard cards
+
+`discardSelected`:
+
+1. validates that cards are selected
+2. validates that discards remain
+3. moves selected cards to discard
+4. draws replacements
+5. decrements discards remaining
+
+### Step 6: Shop and next round
+
+When the target score is beaten:
+
+- the game enters `shop`
+- offers are generated from jokers not already owned
+
+When continuing from shop:
+
+- the round increases
+- ante and blind update
+- the next round is set up
+- a fresh hand is drawn
+
+---
+
+## 9. How Deck Logic Works
+
+The deck code lives in `src/game/core/deck.ts`.
+
+### `createDeck`
+
+Creates the standard 52-card deck from all suits and ranks.
+
+### `shuffle`
+
+Uses a deterministic seeded random generator.
+
+That means:
+
+- the same seed produces the same shuffle
+- behavior becomes more testable
+- game logic is more reproducible
+
+This is a good approach in card games because it avoids hidden `Math.random()` everywhere.
+
+### `drawCards`
+
+Draw logic:
+
+1. copy current draw and discard piles
+2. draw from the front of `drawPile`
+3. if `drawPile` is empty, reshuffle discard into draw
+4. continue until count is reached or cards run out
+
+This function returns:
+
+- drawn cards
+- remaining draw pile
+- remaining discard pile
+- updated seed
+
+This is clean because one function owns all draw-pile mutation rules.
+
+---
+
+## 10. How Hand Evaluation Works
+
+The poker-like evaluation logic lives in `src/game/core/handEvaluator.ts`.
+
+The function:
+
+- sorts cards by rank descending
+- groups them by rank
+- checks flush
+- checks straight
+- checks grouped hands in priority order
+
+Priority order matters.
+
+The evaluator checks:
+
+1. straight flush
+2. four of a kind
+3. full house
+4. flush
+5. straight
+6. three of a kind
+7. two pair
+8. pair
+9. high card
+
+It returns a `HandEvaluation` object instead of just a string.
+
+That is important because the next stage needs more than the hand name.
+
+The evaluation includes:
+
+- `handName`
+- `scoringCards`
+- `kickers`
+- `highestRank`
+- `isFlush`
+- `isStraight`
+- `selectedCount`
+
+This makes scoring flexible because joker modifiers can inspect rich hand metadata.
+
+---
+
+## 11. How Scoring Works
+
+Scoring lives in `src/game/core/scoring.ts`.
+
+The scoring pipeline is:
+
+1. get base hand chips and mult from the hand type
+2. add chip value from scoring cards
+3. build a starting breakdown
+4. pass breakdown through joker modifiers
+5. compute final total as `chips * mult`
+
+This is a strong design because it is staged.
+
+Instead of one giant formula, the code says:
+
+- here is the base score
+- now modifiers can transform it
+- now compute the final total
+
+That structure is easier to extend later.
+
+---
+
+## 12. Why Selectors Matter In React Game Code
+
+Selectors are one of the most educational parts of this project.
+
+`selectHandPreview` is a good example of how to think in React:
+
+- raw state = selected card IDs and hand cards
+- derived state = evaluated hand and preview score
+
+The selector computes the preview when needed.
+
+That means:
+
+- reducer state stays smaller
+- components stay cleaner
+- game logic remains reusable
+
+If you build more games in React, always ask:
+
+"Is this value permanent game state, or is it derived from existing state?"
+
+If it is derived, prefer a selector or pure function.
+
+---
+
+## 13. How The React App Layer Is Organized
+
+### `src/main.tsx`
+
+The app bootstrap:
+
+- creates the React root
+- provides the Redux store
+- loads global CSS
+
+### `src/app/App.tsx`
+
+The app shell:
+
+- loads saved state from local storage
+- persists ongoing runs
+- switches between menu and run screen
+
+This file is the app-level coordinator.
+
+It should not own detailed gameplay rules.
+
+### `src/ui/screens/RunScreen.tsx`
+
+The run screen composes the play UI:
+
+- HUD
+- joker row
+- play field
+- hand
+- sort controls
+- deck viewer
+- shop
+- end-of-run banners
+
+After refactoring, this file mostly wires things together instead of embedding all interaction logic directly.
+
+That is a good sign.
+
+---
+
+## 14. How Temporary UI State Is Different From Game State
+
+This project uses an important separation:
+
+- permanent state goes into Redux
+- temporary presentation state stays local to React
+
+Examples of temporary state:
+
+- whether the deck viewer modal is open
+- current hand visual ordering
+- whether a play sequence animation is active
+- which cards are visually "locked" during telegraphing
+
+This is good because these details affect experience, not core rules.
+
+If you stored too much of this in Redux, the store would become noisy and harder to reason about.
+
+---
+
+## 15. Hand Sorting Architecture
+
+The hand sorting logic is split into:
+
+- `src/ui/screens/run-screen/handSort.ts`
+- `src/ui/screens/run-screen/useHandState.ts`
+
+### `handSort.ts`
+
+Contains pure helpers:
+
+- comparing by rank
+- comparing by suit
+- sorting hand order
+- syncing old order against new cards
+- rebuilding ordered hand arrays
+
+This file has no React logic.
+
+That is exactly how pure domain-ish helpers should look.
+
+### `useHandState.ts`
+
+This hook owns only hand order behavior:
+
+- current sort mode
+- current order IDs
+- automatic reset to rank sort when hand contents change
+- manual reorder mode when cards are dragged
+
+This is a strong pattern:
+
+- pure functions define the rules
+- hook manages when to apply them
+
+That is one of the best ways to build interactive React game systems.
+
+---
+
+## 16. Play Telegraphing Architecture
+
+One of the most educational parts of the UI is the staged play sequence.
+
+The actual reducer still plays instantly.
+
+But the player should not experience it instantly.
+
+So the project separates:
+
+- rule commit
+- presentation sequence
+
+That logic is split into:
+
+- `src/ui/screens/run-screen/playSequence.ts`
+- `src/ui/screens/run-screen/usePlaySequence.ts`
+- `src/ui/screens/run-screen/PlayField.tsx`
+
+### `playSequence.ts`
+
+Pure helpers:
+
+- choose selected cards in current visual order
+- create a play sequence object
+- count one card into the sequence
+- compute preview from current counted chips
+- expose locked card IDs
+
+### `usePlaySequence.ts`
+
+React orchestration:
+
+- starts the sequence
+- schedules timed card counts
+- calls sound functions
+- resolves actual play action after the animation
+- clears itself when done
+
+This is a very useful React game pattern.
+
+The idea is:
+
+- keep the true rule update simple
+- build the richer player experience as a temporary staged flow on top of it
+
+### `PlayField.tsx`
+
+Pure render component for:
+
+- showing played cards
+- showing which cards have counted
+- showing live chips/mult/total during the sequence
+
+This keeps rendering logic out of the hook and out of the screen wrapper.
+
+---
+
+## 17. Hand Interaction Architecture
+
+The hand system is split into:
+
+- `src/ui/components/Hand/Hand.tsx`
+- `src/ui/components/Hand/HandCard.tsx`
+- `src/ui/components/Card/Card.tsx`
+- `src/ui/components/Card/cardAppearance.ts`
+
+### `Hand.tsx`
+
+Owns hand-level behavior:
+
+- container ref
+- drag intent suppression
+- keyboard selection handling
+- overlap style generation
+
+### `HandCard.tsx`
+
+Owns one card item in the fan:
+
+- drag config
+- motion config
+- hover/tap animation
+- z-index rules
+- single-card render
+
+### `Card.tsx`
+
+Renders the face of a card only.
+
+That is the right level of abstraction.
+
+The card face component should not need to know about drag state or hand sorting.
+
+### `cardAppearance.ts`
+
+Contains visual suit-class mapping.
+
+This is small, but it matters.
+
+Pulling that helper out prevents the visual mapping function from living inside a render component that has a different job.
+
+---
+
+## 18. How To Think About Clean Game Code In React
+
+If you want to build your own game later, these are the lessons to keep.
+
+### Rule 1: Keep rule logic pure
+
+If the code decides what a move means, try to keep it:
+
+- deterministic
+- side-effect free
+- testable without rendering the UI
+
+Examples in this project:
+
+- `drawCards`
+- `evaluateHand`
+- `scoreHand`
+- `playHand`
+
+### Rule 2: Keep derived values out of permanent state
+
+Examples:
+
+- preview score
+- sorted hand view
+- locked visual card IDs during play animation
+
+These do not need to become part of the long-term reducer state.
+
+### Rule 3: Put timing in hooks, not in reducers
+
+Reducers should answer:
+
+- what happened to the game?
+
+Hooks should answer:
+
+- how should this feel to the player over time?
+
+### Rule 4: Split "screen composition" from "screen logic"
+
+A screen component should eventually become mostly wiring.
+
+When it becomes too large:
+
+- extract pure helpers
+- extract hooks for behavior
+- extract render-only components
+
+### Rule 5: Local UI state is not bad
+
+A common mistake is pushing every piece of state into Redux.
+
+That usually makes game UI worse.
+
+Local UI state is correct for:
+
+- modals
+- temporary animations
+- drag intent
+- current visual ordering
+
+### Rule 6: Simpler code is usually better than clever code
+
+The goal is not "shortest code".
+
+The goal is:
+
+- clear naming
+- small functions
+- obvious data flow
+- code that future you can read quickly
+
+---
+
+## 19. How I Would Build A Similar Game From Scratch
+
+If you want to recreate this later by yourself, this is the order I would follow.
+
+### Phase 1: Model the game
+
+Start with types only.
+
+Define:
+
+- Card
+- Suit
+- Rank
+- HandEvaluation
+- ScoringBreakdown
+- RunState
+
+Do not build UI first.
+
+### Phase 2: Build the engine without React
+
+Write pure functions for:
+
+- deck creation
+- shuffle
+- draw
+- hand evaluation
+- scoring
+- round transitions
+
+Test these first.
+
+If your engine is weak, the UI will become misleading and harder to debug.
+
+### Phase 3: Add Redux or another state container
+
+Wrap engine transitions in actions.
+
+Keep reducer code thin.
+
+Let the reducer call pure engine functions instead of embedding game math directly.
+
+### Phase 4: Build selectors
+
+Before building fancy UI, add selectors for:
+
+- selected cards
+- current blind
+- hand preview
+- whether actions are allowed
+
+This gives the UI a clean API.
+
+### Phase 5: Build the static screen
+
+Only after the engine is stable, render:
+
+- HUD
+- hand
+- controls
+- shop
+- score display
+
+At this stage, do not worry about animation.
+
+### Phase 6: Add interaction
+
+Now add:
+
+- selecting cards
+- dragging cards
+- sort buttons
+- deck viewer
+
+### Phase 7: Add experience layers
+
+Then add:
+
+- play telegraphing
+- count-up feel
+- hover motion
+- screen transitions
+- sound
+
+This order matters.
+
+Do not mix game-rule creation and animation creation at the same time if you can avoid it.
+
+---
+
+## 20. Why This Structure Works Well For Learning
+
+This project is useful educationally because it shows two different kinds of state.
+
+### Permanent game state
+
+Examples:
+
+- money
+- jokers
+- round score
+- draw pile
+- selected card IDs
+
+### Temporary presentation state
+
+Examples:
+
+- current play animation
+- deck viewer visibility
+- local hand order mode
+
+Once you really understand that split, building games in React becomes much easier.
+
+Most beginner React game code becomes messy because:
+
+- engine state
+- view state
+- timing state
+- animation state
+
+all get mixed into the same component.
+
+This project is moving away from that mistake and toward a cleaner structure.
+
+---
+
+## 21. Current Strengths Of The Project
+
+- The core engine is separated from UI.
+- Preview scoring is derived instead of duplicated.
+- The reducer layer is thin.
+- UI sequencing has been extracted into hooks and helper files.
+- The hand interaction model is modular.
+- The project has unit tests for deck, evaluator, and scoring.
+
+These are strong foundations.
+
+---
+
+## 22. Current Weaknesses Or Future Improvements
+
+This section is important if you revisit the project later.
+
+### Audio
+
+The audio layer is still placeholder-oriented.
+
+If you want a fully polished game feel, replace it with real sound assets or synthesized audio.
+
+### Save validation
+
+The save system currently serializes raw run state.
+
+For a stronger production architecture, add:
+
+- schema validation
+- versioning
+- migration support
+
+### Integration testing
+
+The core engine is tested, but complex UI interactions still deserve integration tests.
+
+Examples:
+
+- drag reorder
+- play sequence timing
+- deck viewer open/close
+- save/load restore
+- sort reset on new hand
+
+### Error handling
+
+A production app should also have:
+
+- error boundaries
+- runtime monitoring
+- analytics if needed
+
+---
+
+## 23. Practical Advice For Future You
+
+When you come back to this project later, do not start by changing UI randomly.
+
+Start with these questions:
+
+1. Is this change a rule change or a presentation change?
+2. If it is a rule change, should it live in the engine?
+3. If it is derived, should it be a selector instead of stored state?
+4. If it is temporary and visual, can it stay local in React?
+5. Is this function doing exactly one thing?
+
+If the answer to question 5 is no, split it.
+
+That mindset is what keeps a React game project maintainable.
+
+---
+
+## 24. Final Summary
+
+This project works because it does not treat React as the game engine.
+
+Instead:
+
+- the engine decides the rules
+- Redux stores the current run
+- selectors derive preview data
+- hooks orchestrate temporary experience flows
+- components render the current state of the game
+
+If you remember only one lesson, remember this:
+
+Keep game truth separate from game presentation.
+
+That single architectural habit will make almost every React game you build later easier to understand, easier to test, and easier to expand.
